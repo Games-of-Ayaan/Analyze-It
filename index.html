@@ -234,6 +234,94 @@ footer {
   box-shadow: 0 0 40px rgba(0,255,255,0.4), inset 0 0 20px rgba(0,255,255,0.2);
   transform: scale(1.02);
 }
+.comments-section {
+  margin-top: 40px;
+  background: rgba(0, 40, 60, 0.25);
+  border: 1px solid rgba(0, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 20px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 25px rgba(0, 255, 255, 0.2);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.comment-card {
+  background: rgba(0, 255, 255, 0.05);
+  border: 1px solid rgba(0, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  transition: 0.3s;
+}
+
+.comment-card:hover {
+  background: rgba(0, 255, 255, 0.1);
+  box-shadow: 0 0 15px rgba(0,255,255,0.2);
+}
+
+.comment-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.comment-header img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,255,255,0.3);
+}
+
+.comment-author {
+  font-weight: 600;
+  color: #00ffff;
+}
+
+.comment-text {
+  font-size: 0.9rem;
+  color: #dff;
+  line-height: 1.4;
+  opacity: 0.9;
+}
+.replies-container {
+  margin-left: 45px;
+  margin-top: 10px;
+  border-left: 2px solid rgba(0,255,255,0.2);
+  padding-left: 12px;
+}
+
+.reply-card {
+  background: rgba(0,255,255,0.05);
+  border: 1px solid rgba(0,255,255,0.15);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 8px 0;
+  transition: 0.3s;
+}
+
+.reply-card:hover {
+  background: rgba(0,255,255,0.1);
+  box-shadow: 0 0 10px rgba(0,255,255,0.2);
+}
+
+.view-replies {
+  background: rgba(0,255,255,0.15);
+  border: 1px solid rgba(0,255,255,0.2);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  color: #00ffff;
+  cursor: pointer;
+  transition: 0.3s;
+  margin-top: 5px;
+}
+
+.view-replies:hover {
+  background: rgba(0,255,255,0.25);
+  box-shadow: 0 0 10px rgba(0,255,255,0.4);
+}
 
 .footer-box h4 {
   margin: 0 0 10px;
@@ -286,6 +374,8 @@ footer {
 
     <div id="videoData"></div>
     <div class="charts" id="charts"></div>
+    <div id="commentsSection" class="comments-section"></div>
+
   </div>
 
 <footer>
@@ -392,6 +482,8 @@ function displayVideo(v) {
         <p><b>Earnings (est.):</b> $${earnings}</p>
       </div>
     </div>
+    <button onclick="loadComments('${v.id}')" style="margin-top:15px;">💬 View Comments</button>
+
   `;
 
   renderCharts({ views, likes, comments, reach, earnings });
@@ -439,6 +531,107 @@ function renderCharts(d) {
     });
   });
 }
+async function loadComments(videoId) {
+  const section = document.getElementById("commentsSection");
+  section.innerHTML = `
+    <h3 style="color:#00ffff;text-align:center;">💬 Comments</h3>
+    <p style="text-align:center;opacity:0.7;">Loading comments...</p>
+  `;
+
+  let allComments = [];
+  let nextPageToken = "";
+
+  try {
+    // Fetch all top-level comments with pagination
+    while (true) {
+      const res = await fetch(
+        `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet,replies&videoId=${videoId}&maxResults=100&pageToken=${nextPageToken}&key=${API_KEY}`
+      );
+      const data = await res.json();
+
+      if (!data.items) break;
+      allComments.push(...data.items);
+
+      if (!data.nextPageToken) break;
+      nextPageToken = data.nextPageToken;
+    }
+
+    if (allComments.length === 0) {
+      section.innerHTML = `<h3 style="color:#00ffff;text-align:center;">💬 Comments</h3><p style="text-align:center;opacity:0.7;">No comments found.</p>`;
+      return;
+    }
+
+    // Render top-level comments
+    const commentsHTML = allComments.map(c => {
+      const info = c.snippet.topLevelComment.snippet;
+      const repliesCount = c.snippet.totalReplyCount || 0;
+      const repliesBtn = repliesCount > 0
+        ? `<div class="view-replies" onclick="loadReplies('${c.id}', this)">💬 View ${repliesCount} Replies</div>`
+        : "";
+      return `
+        <div class="comment-card" id="comment-${c.id}">
+          <div class="comment-header">
+            <img src="${info.authorProfileImageUrl}" alt="">
+            <span class="comment-author">${info.authorDisplayName}</span>
+          </div>
+          <div class="comment-text">${info.textDisplay}</div>
+          ${repliesBtn}
+          <div class="replies-container" id="replies-${c.id}"></div>
+        </div>`;
+    }).join("");
+
+    section.innerHTML = `
+      <h3 style="color:#00ffff;text-align:center;">💬 All Comments (${allComments.length})</h3>
+      ${commentsHTML}
+    `;
+
+  } catch (err) {
+    console.error(err);
+    section.innerHTML = `<p style="color:red;text-align:center;">Failed to load comments.</p>`;
+  }
+}
+async function loadReplies(parentId, btn) {
+  const container = document.getElementById(`replies-${parentId}`);
+  if (container.innerHTML.trim() !== "") {
+    // Toggle hide/show if already loaded
+    container.style.display = container.style.display === "none" ? "block" : "none";
+    btn.textContent = container.style.display === "none" ? "💬 View Replies" : "🔽 Hide Replies";
+    return;
+  }
+
+  btn.textContent = "⏳ Loading Replies...";
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/youtube/v3/comments?part=snippet&parentId=${parentId}&maxResults=100&key=${API_KEY}`
+    );
+    const data = await res.json();
+    if (!data.items || data.items.length === 0) {
+      btn.textContent = "No Replies";
+      return;
+    }
+
+    const repliesHTML = data.items.map(r => {
+      const info = r.snippet;
+      return `
+        <div class="reply-card">
+          <div class="comment-header">
+            <img src="${info.authorProfileImageUrl}" alt="">
+            <span class="comment-author">${info.authorDisplayName}</span>
+          </div>
+          <div class="comment-text">${info.textDisplay}</div>
+        </div>`;
+    }).join("");
+
+    container.innerHTML = repliesHTML;
+    btn.textContent = "🔽 Hide Replies";
+
+  } catch (err) {
+    console.error(err);
+    btn.textContent = "Error Loading Replies";
+  }
+}
+
+
 
 function toggleLock() {
   const url = document.getElementById("videoUrl").value.trim();
