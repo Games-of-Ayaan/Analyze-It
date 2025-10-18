@@ -44,8 +44,11 @@ Get one from the Google Cloud Console
 🧠 Commands Summary
 Action	Command	Description
 🧩 Clone Repo	git clone https://github.com/Games-of-Ayaan/Analyze-It.git	Download the code
+
 🚀 Run App	Open index.html	Launch the tool in your browser
+
 🔑 Set API Key	Edit const API_KEY = "..."	Insert your YouTube Data API v3 key
+
 🧹 Clear Lock	LocalStorage → Remove "lockedVideoUrl"	Unlock saved video
 
  UI Highlights
