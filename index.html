@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Analyze It</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600&display=swap');
+
+  :root {
+    --glow: #00ffff;
+    --panel-bg: rgba(0,40,60,0.3);
+    --panel-border: rgba(0,255,255,0.2);
+  }
+
+  body {
+    margin: 0;
+    font-family: 'Orbitron', sans-serif;
+    color: #dff;
+    overflow-x: hidden;
+    background: radial-gradient(circle at center, rgba(0,50,80,0.4) 0%, rgba(0,0,0,0.95) 90%);
+  }
+
+  header {
+    text-align: center;
+    font-size: 2rem;
+    padding: 25px;
+    color: var(--glow);
+    text-shadow: 0 0 20px var(--glow);
+    z-index: 2;
+    position: relative;
+  }
+
+  /* === Glowing animated grid background === */
+  .neon-grid {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 200%;
+    height: 200%;
+    z-index: 0;
+    background:
+      radial-gradient(circle at center, rgba(0,120,255,0.15), transparent 80%),
+      repeating-linear-gradient(
+        transparent 0px,
+        transparent 38px,
+        rgba(0,255,255,0.15) 40px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        transparent 0px,
+        transparent 38px,
+        rgba(0,255,255,0.15) 40px
+      );
+    background-size: 80px 80px;
+    transform: perspective(800px) rotateX(60deg);
+    animation: moveGrid 18s linear infinite;
+    opacity: 0.6;
+  }
+  @keyframes moveGrid {
+    0% { background-position: 0 0, 0 0; }
+    100% { background-position: 0 80px, 80px 0; }
+  }
+
+  .container {
+    position: relative;
+    max-width: 1100px;
+    margin: 40px auto;
+    padding: 30px;
+    background: rgba(0,30,50,0.35);
+    border: 1px solid var(--panel-border);
+    border-radius: 15px;
+    box-shadow: 0 0 30px rgba(0,255,255,0.2);
+    backdrop-filter: blur(10px);
+    z-index: 1;
+  }
+
+  input {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    background: rgba(255,255,255,0.05);
+    color: #0ff;
+  }
+
+  button {
+    background: var(--glow);
+    color: #000;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: 0.3s;
+  }
+  button:hover {
+    box-shadow: 0 0 20px var(--glow);
+    transform: translateY(-2px);
+  }
+
+  .lock-row {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+
+  .lock-status {
+    font-size: 0.9rem;
+    opacity: 0.8;
+  }
+
+  /* === Video Info === */
+  .video-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-top: 25px;
+  }
+
+  .thumb-wrapper {
+    position: relative;
+  }
+  .thumb-wrapper img {
+    width: 260px;
+    border-radius: 10px;
+    border: 1px solid rgba(0,255,255,0.25);
+    box-shadow: 0 0 25px rgba(0,255,255,0.25);
+  }
+  .thumb-download {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,255,255,0.85);
+    color: #000;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    opacity: 0;
+    transition: 0.3s;
+  }
+  .thumb-wrapper:hover .thumb-download {
+    opacity: 1;
+    box-shadow: 0 0 15px #0ff;
+  }
+
+  .details {
+    flex: 1;
+    min-width: 250px;
+  }
+  .details h2 {
+    margin: 0 0 10px;
+    color: var(--glow);
+  }
+  .details a {
+    color: var(--glow);
+    text-decoration: none;
+  }
+  .details a:hover {
+    text-shadow: 0 0 8px #0ff;
+  }
+
+  /* === Charts === */
+  .charts {
+    margin-top: 40px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 25px;
+  }
+
+  .chart-card {
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 0 25px rgba(0,255,255,0.15);
+    transition: 0.4s ease;
+    position: relative;
+  }
+
+  .chart-card h3 {
+    text-align: center;
+    color: var(--glow);
+    margin-bottom: 10px;
+  }
+
+  .chart-card:hover {
+    box-shadow: 0 0 40px rgba(0,255,255,0.4);
+    transform: scale(1.02);
+    cursor: pointer;
+  }
+
+  .chart-card.expanded {
+    transform: scale(1.05);
+    z-index: 5;
+    grid-column: span 2;
+    box-shadow: 0 0 80px rgba(0,255,255,0.5);
+  }
+
+  canvas {
+    width: 100%;
+    height: 250px;
+  }
+  .chart-card.expanded canvas {
+    height: 420px;
+  }
+footer {
+  text-align: center;
+  padding: 40px 20px;
+  color: #0ff;
+  opacity: 0.9;
+  position: relative;
+  z-index: 1;
+}
+
+.footer-box {
+  display: inline-block;
+  background: rgba(0, 40, 60, 0.25);
+  border: 1px solid rgba(0, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 20px 35px;
+  box-shadow: 0 0 25px rgba(0, 255, 255, 0.15), inset 0 0 15px rgba(0,255,255,0.1);
+  backdrop-filter: blur(12px);
+  transition: all 0.4s ease;
+}
+
+.footer-box:hover {
+  box-shadow: 0 0 40px rgba(0,255,255,0.4), inset 0 0 20px rgba(0,255,255,0.2);
+  transform: scale(1.02);
+}
+
+.footer-box h4 {
+  margin: 0 0 10px;
+  color: #77ffff;
+  text-shadow: 0 0 10px #00ffff;
+  letter-spacing: 1px;
+}
+
+.footer-box p {
+  margin: 0;
+  font-size: 0.95rem;
+  opacity: 0.85;
+}
+
+.footer-box a {
+  color: #00ffff;
+  text-decoration: none;
+  font-weight: 600;
+  transition: 0.3s;
+}
+
+.footer-box a:hover {
+  text-shadow: 0 0 12px #00ffff;
+  color: #00bfff;
+}
+</style>
+</head>
+<body>
+  <div class="neon-grid"></div>
+  <header>⚡ YouTube Analyzer</header>
+ <p style="
+  text-align:center;
+  color:#77ffff;
+  font-size:1rem;
+  margin-top:-10px;
+  margin-bottom:30px;
+  letter-spacing:1px;
+  text-shadow:0 0 10px #00ffff;
+">
+  Get all the insights on one page
+</p>
+
+  <div class="container">
+    <div class="lock-row">
+      <input id="videoUrl" type="text" placeholder="Paste YouTube video link..." />
+      <button onclick="analyzeVideo()">Analyze</button>
+      <button onclick="toggleLock()">🔒 Lock</button>
+      <span class="lock-status" id="lockStatus">Unlocked</span>
+    </div>
+
+    <div id="videoData"></div>
+    <div class="charts" id="charts"></div>
+  </div>
+
+<footer>
+  <div class="footer-box">
+    <h4>A GameDev Ayaan Creation</h4>
+    <p>Wanna make changes?<br>
+      Get the source code on
+      <a href="https://github.com/Games-of-Ayaan/Analyze-It"
+         target="_blank">GitHub</a>.
+    </p>
+  </div>
+</footer>
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const API_KEY = "AIzaSyB34NAd7ygL51EwaL4Ss3I48lWIJ2GhHqc";
+
+window.addEventListener("load", () => {
+  const locked = localStorage.getItem("lockedVideoUrl");
+  if (locked) {
+    document.getElementById("videoUrl").value = locked;
+    document.getElementById("lockStatus").textContent = "🔒 Locked";
+    analyzeVideo(true);
+  }
+});
+
+function extractVideoId(url) {
+  try {
+    // Normalize input
+    if (!url) return null;
+    url = url.trim();
+
+    // Handle youtu.be short links
+    let match = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+    if (match) return match[1];
+
+    // Handle youtube.com/watch?v= or with extra params
+    match = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+    if (match) return match[1];
+
+    // Handle shorts links
+    match = url.match(/shorts\/([a-zA-Z0-9_-]{11})/);
+    if (match) return match[1];
+
+    // Handle embed format
+    match = url.match(/embed\/([a-zA-Z0-9_-]{11})/);
+    if (match) return match[1];
+
+    // Handle weird "share" links with ?si= or ?feature=share
+    match = url.match(/([a-zA-Z0-9_-]{11})(?:\?.*)?$/);
+    if (match) return match[1];
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+
+async function analyzeVideo(isLocked = false) {
+  const url = document.getElementById("videoUrl").value.trim();
+  const vid = extractVideoId(url);
+  if (!vid) return alert("Invalid YouTube link.");
+
+  const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=${vid}&key=${API_KEY}`);
+  const data = await res.json();
+  const video = data.items?.[0];
+  if (!video) return alert("Video not found.");
+
+  if (!isLocked) localStorage.setItem("lastVideoUrl", url);
+  displayVideo(video);
+}
+
+function parseDuration(iso) {
+  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  const h = +m?.[1] || 0, mn = +m?.[2] || 0, s = +m?.[3] || 0;
+  return h * 3600 + mn * 60 + s;
+}
+
+function displayVideo(v) {
+  const s = v.snippet, st = v.statistics;
+  const views = +st.viewCount, likes = +st.likeCount || 0, comments = +st.commentCount || 0;
+  const dur = parseDuration(v.contentDetails.duration);
+  const reach = ((likes + comments) / views) * 100;
+  const earnings = ((views / 1000) * 3.5).toFixed(2);
+  const avgWatch = Math.round(Math.min(dur * 0.6, dur) / 60);
+  const hdThumb = `https://img.youtube.com/vi/${v.id}/maxresdefault.jpg`;
+
+  document.getElementById("videoData").innerHTML = `
+    <div class="video-info">
+      <div class="thumb-wrapper">
+        <img src="${s.thumbnails.medium.url}" alt="">
+        <button class="thumb-download" onclick="window.open('${hdThumb}','_blank')">⬇️ HD Thumbnail</button>
+      </div>
+      <div class="details">
+        <h2>${s.title}</h2>
+        <p><b>Channel:</b> <a href="https://www.youtube.com/channel/${s.channelId}" target="_blank">${s.channelTitle}</a></p>
+        <p><b>Views:</b> ${views.toLocaleString()}</p>
+        <p><b>Likes:</b> ${likes.toLocaleString()}</p>
+        <p><b>Comments:</b> ${comments.toLocaleString()}</p>
+        <p><b>Avg Watch Time:</b> ${avgWatch} min</p>
+        <p><b>Reach:</b> ${reach.toFixed(2)}%</p>
+        <p><b>Earnings (est.):</b> $${earnings}</p>
+      </div>
+    </div>
+  `;
+
+  renderCharts({ views, likes, comments, reach, earnings });
+}
+
+function renderCharts(d) {
+  const area = document.getElementById("charts");
+  area.innerHTML = "";
+  const charts = [
+    { title: "Engagement Metrics", labels: ["Views", "Likes", "Comments"], data: [d.views, d.likes, d.comments], type: "bar" },
+    { title: "Reach & Earnings", labels: ["Reach %", "Earnings ($)"], data: [d.reach, d.earnings], type: "doughnut" },
+  ];
+  charts.forEach((c, i) => {
+    const card = document.createElement("div");
+    card.className = "chart-card";
+    card.innerHTML = `<h3>${c.title}</h3><canvas id="chart${i}"></canvas>`;
+    card.onclick = () => {
+      document.querySelectorAll(".chart-card").forEach(x => x.classList.remove("expanded"));
+      card.classList.toggle("expanded");
+      setTimeout(() => Chart.getChart(`chart${i}`)?.resize(), 400);
+    };
+    area.appendChild(card);
+    new Chart(document.getElementById(`chart${i}`), {
+      type: c.type,
+      data: {
+        labels: c.labels,
+        datasets: [{
+          label: c.title,
+          data: c.data,
+          backgroundColor: ["#00bfff80", "#00ffff80", "#0099ff80"],
+          borderColor: "#00ffff",
+          borderWidth: 1.5
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { labels: { color: "#0ff" } }
+        },
+        scales: {
+          y: { ticks: { color: "#0ff" }, beginAtZero: true },
+          x: { ticks: { color: "#0ff" } }
+        }
+      }
+    });
+  });
+}
+
+function toggleLock() {
+  const url = document.getElementById("videoUrl").value.trim();
+  const locked = localStorage.getItem("lockedVideoUrl");
+  if (locked) {
+    localStorage.removeItem("lockedVideoUrl");
+    document.getElementById("lockStatus").textContent = "Unlocked";
+  } else {
+    if (!url) return alert("Enter a video URL first.");
+    localStorage.setItem("lockedVideoUrl", url);
+    document.getElementById("lockStatus").textContent = "🔒 Locked";
+  }
+}
+</script>
+</body>
+</html>
